@@ -21,6 +21,13 @@ class CellPoseBase(StackAlgorithm, ABC):
     def __init__(self):
         super().__init__()
         self.model = models.Cellpose()
+        
+    @classmethod
+    def get_fields(cls) -> List[Union[AlgorithmProperty, str]]:
+        return [
+            AlgorithmProperty("cell_channel", "Cells", 0, property_type=Channel),
+            AlgorithmProperty("diameter", "Diameter", 30, options_range=(0, 10000))
+        ]
 
 class CellposeCytoSegmentation(StackAlgorithm):
     def calculation_run(self, report_fun: Callable[[str, int], None]) -> SegmentationResult:
@@ -65,9 +72,3 @@ class CellposeNucleiSegmentation(StackAlgorithm):
     def get_name(cls):
         return "Cellpose cyto"
 
-    @classmethod
-    def get_fields(cls) -> List[Union[AlgorithmProperty, str]]:
-        return [
-            AlgorithmProperty("cell_channel", "Cells", 0, property_type=Channel),
-            AlgorithmProperty("diameter", "Diameter", 30, options_range=(0, 10000))
-        ]

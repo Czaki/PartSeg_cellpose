@@ -1,8 +1,8 @@
 
-from .cellpose_plugin import CellposeSegmentation
+from .cellpose_plugin import CellposeCytoSegmentation
 
 def register():
     print("buka")
     from PartSegCore.register import register, RegisterEnum
 
-    register(CellposeSegmentation, RegisterEnum.mask_algorithm)
+    register(CellposeCytoSegmentation, RegisterEnum.mask_algorithm)
