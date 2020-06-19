@@ -1,5 +1,5 @@
-
 from .cellpose_plugin import CellposeCytoSegmentation
+
 
 def register():
     print("buka")

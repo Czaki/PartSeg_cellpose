@@ -5,10 +5,11 @@ from typing import Callable, List, Union, Tuple
 
 import numpy as np
 
-from PartSegCore.algorithm_describe_base import SegmentationProfile, AlgorithmProperty
+from PartSegCore.algorithm_describe_base import SegmentationProfile, AlgorithmProperty, AlgorithmDescribeBase
 from PartSegCore.channel_class import Channel
 from PartSegCore.class_generator import enum_register
 from PartSegCore.segmentation.algorithm_base import SegmentationResult, AdditionalLayerDescription
+from PartSegCore.segmentation.noise_filtering import noise_filtering_dict
 from PartSegCore.segmentation.segmentation_algorithm import StackAlgorithm
 
 from cellpose import models
@@ -24,17 +25,26 @@ class CellposeModels(Enum):
 
 enum_register.register_class(CellposeModels)
 
+model = models.Cellpose(gpu=False, model_type="cyto")
+
 
 class CellPoseBase(StackAlgorithm, ABC):
     def __init__(self):
         super().__init__()
         self.parameters = {}
-        self.model = models.Cellpose(gpu=False, model_type="cyto")
+        self.base_info = {}
 
     @classmethod
     def get_fields(cls) -> List[Union[AlgorithmProperty, str]]:
         return [
             AlgorithmProperty("nucleus_channel", "Nucleus", 0, property_type=Channel),
+            AlgorithmProperty(
+                "noise_filtering_nucleus",
+                "Filter nucleus channel",
+                next(iter(noise_filtering_dict.keys())),
+                possible_values=noise_filtering_dict,
+                property_type=AlgorithmDescribeBase,
+            ),
             AlgorithmProperty("diameter", "Diameter", 30, options_range=(0, 10000)),
         ]
 
@@ -54,24 +64,42 @@ class CellPoseBase(StackAlgorithm, ABC):
 
     def calculation_run(self, report_fun: Callable[[str, int], None]) -> SegmentationResult:
         data, channels = self.get_data()
-        masks, flows, _styles, _diams = self.model.eval(data, diameter=self.parameters["diameter"], channels=channels)
+        masks, flows, styles, diams = model.eval(data, diameter=self.parameters["diameter"], channels=channels)
         add = {f"flows {i}": AdditionalLayerDescription(flow, layer_type="image") for i, flow in enumerate(flows)}
         add["mask"] = AdditionalLayerDescription(masks, layer_type="image")
+        self.base_info["diams"] = diams
+        self.base_info["styles"] = styles
+        print(diams)
         return SegmentationResult(masks, self.get_segmentation_profile(), additional_layers=add)
 
 
 class CellposeCytoSegmentation(CellPoseBase):
-    def get_data(self) -> Tuple[np.ndarray, Tuple[int, int]]:
-        nucleus_channel = np.squeeze(self.image.get_channel(self.parameters["nucleus_channel"]))
-        cell_channel = np.squeeze(self.image.get_channel(self.parameters["cell_channel"]))
-        channel_shape = nucleus_channel.shape + (1,)
-        res = np.concatenate(
-            [nucleus_channel.reshape(channel_shape), cell_channel.reshape(channel_shape)], axis=len(channel_shape) - 1
+    def get_data(self) -> Tuple[np.ndarray, List[int]]:
+        cell_channel = np.squeeze(
+            noise_filtering_dict[self.parameters["noise_filtering_cells"]["name"]].noise_filter(
+                self.image.get_channel(self.parameters["cell_channel"]),
+                self.image.spacing,
+                self.parameters["noise_filtering_cells"]["values"],
+            )
         )
-        return res, (1, 2)
+        nucleus_channel = np.squeeze(
+            noise_filtering_dict[self.parameters["noise_filtering_nucleus"]["name"]].noise_filter(
+                self.image.get_channel(self.parameters["nucleus_channel"]),
+                self.image.spacing,
+                self.parameters["noise_filtering_nucleus"]["values"],
+            )
+        )
+
+        channel_shape = nucleus_channel.shape + (1,)
+        zeros = np.zeros(channel_shape, dtype=cell_channel.dtype)
+        res = np.concatenate(
+            [cell_channel.reshape(channel_shape), nucleus_channel.reshape(channel_shape), zeros],
+            axis=len(channel_shape) - 1,
+        )
+        return res, [1, 2]
 
     def get_info_text(self):
-        return ""
+        return f"Estimated cell radius: {self.base_info['diams']}"
 
     @classmethod
     def get_name(cls):
@@ -80,7 +108,18 @@ class CellposeCytoSegmentation(CellPoseBase):
     @classmethod
     def get_fields(cls) -> List[Union[AlgorithmProperty, str]]:
         fields = super().get_fields()
-        fields.insert(1, AlgorithmProperty("cell_channel", "Cells", 0, property_type=Channel))
+        fields.insert(0, AlgorithmProperty("cell_channel", "Cells", 0, property_type=Channel))
+        fields.insert(
+            1,
+            AlgorithmProperty(
+                "noise_filtering_cells",
+                "Filter cells channel",
+                next(iter(noise_filtering_dict.keys())),
+                possible_values=noise_filtering_dict,
+                property_type=AlgorithmDescribeBase,
+            ),
+        )
+
         return fields
 
 

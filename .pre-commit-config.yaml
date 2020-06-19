@@ -33,3 +33,11 @@ repos:
     rev: v1.5.1
     hooks:
     -   id: rst-backticks
+-   repo: https://github.com/aflc/pre-commit-jupyter
+    rev: v1.0.0
+    hooks:
+      - id: jupyter-notebook-cleanup
+        args:
+          - --remove-kernel-metadata
+          - --pin-patterns
+          - "[pin];[donotremove]"
