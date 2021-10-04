@@ -5,7 +5,7 @@ from typing import Callable, List, Union, Tuple
 
 import numpy as np
 
-from PartSegCore.algorithm_describe_base import SegmentationProfile, AlgorithmProperty, AlgorithmDescribeBase
+from PartSegCore.algorithm_describe_base import ROIExtractionProfile, AlgorithmProperty, AlgorithmDescribeBase
 from PartSegCore.channel_class import Channel
 from PartSegCore.class_generator import enum_register
 from PartSegCore.segmentation.algorithm_base import SegmentationResult, AdditionalLayerDescription
@@ -48,8 +48,8 @@ class CellPoseBase(StackAlgorithm, ABC):
             AlgorithmProperty("diameter", "Diameter", 30, options_range=(0, 10000)),
         ]
 
-    def get_segmentation_profile(self) -> SegmentationProfile:
-        return SegmentationProfile("", self.get_name(), deepcopy(self.parameters))
+    def get_segmentation_profile(self) -> ROIExtractionProfile:
+        return ROIExtractionProfile("", self.get_name(), deepcopy(self.parameters))
 
     def set_parameters(self, **kwargs):
         base_names = [x.name for x in self.get_fields() if isinstance(x, AlgorithmProperty)]
